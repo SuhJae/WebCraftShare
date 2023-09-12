@@ -1,0 +1,19 @@
+{
+  "secret_key": "NbHyY4LB!tse8Mqyx7CgqMzg5cmpK!#EDfKN7Fc9",
+  "security": {
+    "enabled": true,
+    "lockout-thresholds": {
+      "5": 60,
+      "8": 300,
+      "10": 3600,
+      "15": 86400,
+      "20": -1
+    },
+    "lockout-by": {
+      "ip": true,
+      "session": true,
+      "user-agent": false,
+      "referer": false
+    }
+  }
+}
