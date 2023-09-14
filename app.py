@@ -5,7 +5,6 @@ import time
 import zipfile
 
 from flask import Flask, send_from_directory, request, redirect, url_for, session, send_file
-
 from auth import Authenticator
 
 # ==================== Initialize app and login manager ====================
@@ -16,6 +15,14 @@ app.secret_key = config['secret_key']
 
 authenticator = Authenticator()
 LOCKOUT_THRESHOLDS = config['security']['lockout-thresholds']
+
+if not config['security']['enabled']:
+    print("WARNING: Security is disabled! This is not recommended for production use!")
+    print("WARNING: Anybody can login with any username and password!")
+    print("WARNING: To enable security, set 'enabled' to True in config.json")
+    print("WARNING: To enable security, set 'enabled' to True in config.json")
+    print("WARNING: To enable security, set 'enabled' to True in config.json")
+    print("WARNING: YOU HAVE BEEN WARNED!")
 
 
 # ==================== Lockdown functions ====================
@@ -35,6 +42,7 @@ def login():
     return send_from_directory('static', 'html/login.html')
 
 
+# ==================== Authentication routes ====================
 @app.route('/auth/<path:action>', methods=['POST', 'GET'])
 def auth_route(action):
     if not config['security']['enabled']:
@@ -88,6 +96,8 @@ def auth_route(action):
         return {"success": False, "message": "Invalid action!"}
 
 
+# ==================== Home page routes ====================
+# only allow logged in users to access the home page
 @app.route('/home/')
 def home():
     if 'username' in session:
@@ -95,6 +105,7 @@ def home():
     return redirect(url_for('login'))  # Redirect to login page if the user is not logged in
 
 
+# ==================== API for authenticated users ====================
 @app.route('/api/<path:action>', methods=['GET', 'POST'])
 def api_route(action):
     if 'username' not in session:
@@ -218,6 +229,7 @@ def api_route(action):
         return {"success": False, "message": "Invalid action!"}
 
 
+# ==================== Serve user sites ====================
 @app.route('/sites/<user>/<slug>/', defaults={'path': ''})
 @app.route('/sites/<user>/<slug>/<path:path>')
 def serve_site(user, slug, path=''):
@@ -237,5 +249,6 @@ def serve_site(user, slug, path=''):
         return send_from_directory('static', 'html/404.html')
 
 
+# ==================== Run the app ====================
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)

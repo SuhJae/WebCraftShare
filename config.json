@@ -1,5 +1,5 @@
 {
-  "secret_key": "NbHyY4LB!tse8Mqyx7CgqMzg5cmpK!#EDfKN7Fc9",
+  "secret_key": "SECRET_KEY",
   "security": {
     "enabled": true,
     "lockout-thresholds": {
