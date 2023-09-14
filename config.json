@@ -8,12 +8,6 @@
       "10": 3600,
       "15": 86400,
       "20": -1
-    },
-    "lockout-by": {
-      "ip": true,
-      "session": true,
-      "user-agent": false,
-      "referer": false
     }
   }
 }

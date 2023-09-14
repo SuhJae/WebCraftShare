@@ -8,6 +8,7 @@
 
     <link rel="stylesheet" href="/css/pico.min.css"/>
     <link rel="stylesheet" href="/css/pico.colors.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="/css/theme.css"/>
 
     <!-- Add favicon -->
@@ -18,6 +19,20 @@
 
 <body>
 <div id="app">
+    <dialog :open="isDialogOpen" class="pico-dialog">
+        <article>
+            <header>
+                <Link aria-label="Close" to="#" class="close" @click="isDialogOpen = false"/>
+                <p>
+                    <strong>{{dialogTitle}}</strong>
+                </p>
+            </header>
+            <p>
+                <span v-html="dialogMessage"></span>
+            </p>
+        </article>
+    </dialog>
+
     <main class="container">
         <nav>
             <ul>
@@ -34,21 +49,50 @@
         </nav>
 
         <main class="container">
-            <article>
-                <h1>Upload website</h1>
-                <p>Upload your website here. You must upload <u>a folder with an index.html</u> file.</p>
-                <hr>
 
-                <form @submit.prevent="uploadFolder">
-                    <input type="file" ref="folderInput" webkitdirectory @change="checkFiles">
-                    <small v-if="!filesValid" class="pico-color-red-500">Make sure it is a folder that has index.html inside.</small>
-                    <input type="text" v-model="slug" placeholder="Enter slug" :aria-invalid="slugAriaInvalid" maxlength="20">
-                    <small v-if="slugAriaInvalid" class="pico-color-red-500"> {{slugMessage}} </small>
-                    <button type="submit" :aria-busy="isUploading ? 'true' : 'false'"
-                            :disabled="!(filesValid && slugValid)" style="width: 100%">Upload</button>
-                </form>
-            </article>
+            <h1>Upload website</h1>
+            <p>Upload your website here. You must upload <u>a folder with an index.html</u> file.</p>
+            <hr>
+
+            <form @submit.prevent="uploadFolder">
+                <input type="file" ref="folderInput" webkitdirectory @change="checkFiles">
+                <small v-if="!filesValid" class="pico-color-red-500">Make sure it is a folder that has index.html
+                    inside.</small>
+                <input type="text" v-model="slug" placeholder="Enter slug" :aria-invalid="slugAriaInvalid"
+                       maxlength="20">
+                <small v-if="slugAriaInvalid" class="pico-color-red-500"> {{slugMessage}} </small>
+                <button type="submit" :aria-busy="isUploading ? 'true' : 'false'"
+                        :disabled="!(filesValid && slugValid)" style="width: 100%">Upload
+                </button>
+                <small> The webpage will be hosted at <kbd>{{domain}}/sites/{{userName}}/{{slug}}</kbd></small>
+            </form>
         </main>
+        <hr>
+
+        <article style="padding-top: 2em">
+            <h1>Your Websites</h1>
+            <table>
+                <tr>
+                    <th>Slug (Name)</th>
+                    <th>URL</th>
+                    <th>Actions</th>
+                </tr>
+                <tr v-for="site in sites">
+                    <td>{{site.slug}}</td>
+                    <td><a :href="site.url" target="_blank">{{site.url}}</a></td>
+                    <td>
+                        <div class="container-fluid">
+                            <div class="grid">
+                                <button @click="downloadSite(site.slug)"><i class="fa fa-download"></i></button>
+                                <button @click="deleteSite(site.slug)" :aria-busy="isDeleting ? 'true' : 'false'"
+                                        class="contrast"><i class="fa fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </td>
+            </table>
+        </article>
+
+
     </main>
 </div>
 
