@@ -9,5 +9,14 @@
       "15": 86400,
       "20": -1
     }
+  },
+  "db": {
+    "host": "mongodb://localhost:27017",
+    "dbname": "WebCraftShare",
+    "auth": {
+      "enabled": false,
+      "user": "user",
+      "password": "password"
+    }
   }
 }
