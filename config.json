@@ -1,5 +1,9 @@
 {
-  "secret_key": "siduhchiefewfwewfewuhihuichsiu",
+  "dev_mode": true,
+  "secret_key": "SECRET",
+  "organization_name": "ORGANIZATION",
+  "organization_domain": "example.com",
+  "server_host": "http://127.0.0.1:5001",
   "security": {
     "enabled": true,
     "lockout-thresholds": {

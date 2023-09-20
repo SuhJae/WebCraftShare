@@ -50,7 +50,7 @@ class Database:
 
         self.db = self.client[dbname]
 
-    def add_user(self, email: str, password: str, handle: str, signup_ip: str, signup_time: int):
+    def add_user(self, email: str, password: str, handle: str, signup_ip: str, signup_time: int = int(time.time())):
         """Add a new user to the database. It will hash the password and generate a salt.
         :param email: The user's email address.
         :param password: The user's password.
@@ -76,6 +76,67 @@ class Database:
 
         self.db.users.insert_one(user)
         return user
+
+    def change_password(self, email: str, password: str):
+        """Change a user's password.
+        :param email: The user's email address.
+        :param password: The user's password.
+        :return: None
+        """
+
+        salt = os.urandom(32)
+        hashed_password = PasswordHasher().hash(password + salt.hex())
+
+        self.db.users.update_one({"email": email}, {"$set": {"password": hashed_password, "salt": Binary(salt)}})
+
+    def password_reset_token(self, email: str, expires: int = 600):
+        """ Add a new password reset token to the database.
+        :param email: The user's email address.
+        :return: temparary password
+        """
+
+        if self.db.password_reset_tokens.find_one({"email": email}) is not None:
+            self.db.password_reset_tokens.delete_many({"email": email})
+
+        reset_token = _generate_access_code(64)
+
+        password_reset_token = {
+            "email": email,
+            "reset_token": reset_token,
+            "expires": time.time() + expires
+        }
+
+        self.db.password_reset_tokens.insert_one(password_reset_token)
+        return reset_token
+
+    def validate_password_reset_token(self, reset_token: str):
+        """ Validate a password reset token.
+        :param reset_token: The user's reset token.
+        :return: Boolean value indicating whether the reset token is valid.
+        """
+
+        password_reset_token = self.db.password_reset_tokens.find_one({"reset_token": reset_token})
+
+        if password_reset_token is None:
+            return False
+        elif password_reset_token["expires"] < time.time():
+            return False
+        else:
+            return password_reset_token["email"]
+
+    def reset_password(self, reset_token: str, password: str):
+        """ Reset a user's password.
+        :param reset_token: The user's reset token.
+        :param password: The user's new password.
+        :return: None
+        """
+
+        salt = os.urandom(32)
+        hashed_password = PasswordHasher().hash(password + salt.hex())
+
+        email = self.validate_password_reset_token(reset_token)
+        self.db.users.update_one({"email": email}, {"$set": {"password": hashed_password, "salt": Binary(salt)}})
+        self.db.password_reset_tokens.delete_many({"email": email})
 
     def authenticate(self, email: str, password: str):
         """Authenticate a user based on email and password.
@@ -122,37 +183,44 @@ class Database:
         self.db.signup_tokens.insert_one(signup_token)
         return token
 
-    def validate_signup_token(self, access_token: str):
+    def search_signup_token(self, email: str):
+        """ Search for a signup token using email.
+        :param email: The user's email address.
+        :return: Boolean value indicating the existence of the valid signup token.
+        """
+
+        signup_token = self.db.signup_tokens.find_one({"email": email})
+        if signup_token is None:
+            return False
+        elif signup_token["expires"] < time.time():
+            return False
+        else:
+            return True
+
+    def validate_signup_token(self, access_code: str, email: str):
         """ Validate a sign in access token.
-        :param access_token: The user's access token.
+        :param access_code: The user's access token.
+        :param email: The user's email address.
         :return: Boolean value indicating whether the access. If the access token is valid, it will also return the
         user's email address. If the access token is invalid, it will return the reason why it is invalid.
         """
 
-        signup_token = self.db.signup_tokens.find_one({"access_token": access_token})
+        print(access_code, email)
+
+        signup_token = self.db.signup_tokens.find_one({"email": email})
+        print(signup_token)
 
         if signup_token is None:
             return False, "Invalid access token."
 
+        if signup_token["email"] != email:
+            return False, "Invalid email address."
+
         if signup_token["expires"] < time.time():
             return False, "Access token has expired."
 
+        self.db.signup_tokens.delete_many({"email": email})
         return True, signup_token["email"]
-
-    def purge_signup_token(self, access_token: str):
-        """ Purge a signup token from the database.
-        :param access_token: The user's access token.
-        :return: None
-        """
-
-        self.db.signup_tokens.delete_many({"access_token": access_token})
-
-    def clear_signup_token(self):
-        """ Clear all signup tokens from the database. This is for testing purposes only.
-        :return: None
-        """
-
-        self.db.signup_tokens.delete_many({})
 
     def search_user(self, email: str = None, handle: str = None):
         """ Search for a user using email or handle or both.
