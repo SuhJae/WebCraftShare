@@ -43,7 +43,7 @@ def get_lockout_duration(failed_attempts):
 def login():
     if 'username' in session:
         return redirect(url_for('home'))
-    return send_from_directory('static', 'html/login.html')
+    return send_from_directory('static', 'index.html')
 
 
 # ==================== Authentication routes ====================
@@ -105,7 +105,7 @@ def auth_route(action):
 @app.route('/home/')
 def home():
     if 'username' in session:
-        return send_from_directory('static', 'html/home.html')
+        return send_from_directory('static', 'home.html')
     return redirect(url_for('login'))  # Redirect to login page if the user is not logged in
 
 
@@ -250,7 +250,7 @@ def serve_site(user, slug, path=''):
     if os.path.exists(os.path.join('userdata', user, slug, path)):
         return send_from_directory(os.path.join('userdata', user, slug), path)
     else:
-        return send_from_directory('static', 'html/404.html')
+        return send_from_directory('static', '404.html')
 
 
 # ==================== Run the app ====================
