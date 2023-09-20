@@ -6,12 +6,16 @@ import zipfile
 
 from flask import Flask, send_from_directory, request, redirect, url_for, session, send_file
 from auth import Authenticator
+from flask_cors import CORS
 
 # ==================== Initialize app and login manager ====================
 with open('config.json') as f:
     config = json.load(f)
 app = Flask(__name__, static_url_path='', static_folder='static', template_folder='templates')
 app.secret_key = config['secret_key']
+
+CORS(app, resources={r"/api/*": {"origins": "*"}}) # this, when developing frontend using vuejs it allows /api/
+# to be accessed from any origin
 
 authenticator = Authenticator()
 LOCKOUT_THRESHOLDS = config['security']['lockout-thresholds']
@@ -251,4 +255,4 @@ def serve_site(user, slug, path=''):
 
 # ==================== Run the app ====================
 if __name__ == '__main__':
-    app.run(debug=False)
+    app.run(debug=False, port=5001)

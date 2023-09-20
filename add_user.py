@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from argon2 import PasswordHasher
 
 
@@ -15,12 +16,13 @@ def is_password_common(password):
         return password in file.read()
 
 
-def get_username(users):
+def get_useremail(users):
     """Prompt user for a valid username."""
     while True:
-        username = input("Enter username: ")
-        if not username.isalnum():
-            print("Username must only contain alphanumeric characters. Please try again.")
+        username = input("Enter user email: ")
+        # ckeck if email is valid using regex
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", username):
+            print('Email is invalid. Please try again.')
         elif username.lower() in users:
             print("Username already exists. Please try again.")
         else:
@@ -46,7 +48,7 @@ def get_password():
 def main():
     users = load_users()
 
-    username = get_username(users)
+    username = get_useremail(users)
     password = get_password()
 
     salt = os.urandom(32).hex()
