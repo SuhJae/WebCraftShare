@@ -5,24 +5,22 @@ import time
 import zipfile
 
 from flask import Flask, send_from_directory, request, redirect, url_for, session, send_file
-from auth import Authenticator
-from flask_cors import CORS
+
+import db
 
 # ==================== Initialize app and login manager ====================
 with open('config.json') as f:
     config = json.load(f)
+
 app = Flask(__name__, static_url_path='', static_folder='static', template_folder='templates')
 app.secret_key = config['secret_key']
 
-CORS(app, resources={r"/api/*": {"origins": "*"}}) # this, when developing frontend using vuejs it allows /api/
-# to be accessed from any origin
-
-authenticator = Authenticator()
+db = db.Database('config.json')
 LOCKOUT_THRESHOLDS = config['security']['lockout-thresholds']
 
 if not config['security']['enabled']:
     print("WARNING: Security is disabled! This is not recommended for production use!")
-    print("WARNING: Anybody can login with any username and password!")
+    print("WARNING: Anybody can login with any email and password!")
     print("WARNING: To enable security, set 'enabled' to True in config.json")
     print("WARNING: To enable security, set 'enabled' to True in config.json")
     print("WARNING: To enable security, set 'enabled' to True in config.json")
@@ -41,7 +39,7 @@ def get_lockout_duration(failed_attempts):
 # ==================== Login manager callback functions ====================
 @app.route('/', methods=['GET', 'POST'])
 def login():
-    if 'username' in session:
+    if 'email' in session:
         return redirect(url_for('home'))
     return send_from_directory('static', 'index.html')
 
@@ -69,14 +67,13 @@ def auth_route(action):
                 session.pop('lockout_time', None)
                 session.pop('failed_attempts', None)
 
-        username = request.form['username']
+        email = request.form['email']
         password = request.form['password']
-        time.sleep(1)
 
-        if authenticator.authenticate(username, password):
-            session['username'] = username
+        if db.authenticate(email, password):
+            session['email'] = email
             session.pop('failed_attempts', None)
-            return {"success": True, "message": f"Welcome {session['username']}!"}
+            return {"success": True, "message": f"Succesfully logged in as {email}!"}
         else:
             session['failed_attempts'] = session.get('failed_attempts', 0) + 1
             lockout_duration = get_lockout_duration(session['failed_attempts'])
@@ -87,14 +84,15 @@ def auth_route(action):
                             "message": "Your account is locked permanently due to too many failed attempts."}
                 return {"success": False, "message": "Too many failed attempts. Please try again later."}
             else:
-                return {"success": False, "message": "Invalid username or password!"}
+                return {"success": False, "message": f"Invalid email or password! ({session['failed_attempts']})"}
 
-    elif action in ['checkuser', 'checkuser/']:
-        username = request.args.get('username')
-        if authenticator.user_exists(username):
-            return {"exists": True}
-        else:
+    elif action in ['checkhandle', 'checkhandle/']:
+        handle = request.args.get('handle')
+
+        if db.search_user(handle=handle) is None:
             return {"exists": False}
+        else:
+            return {"exists": True}
 
     else:
         return {"success": False, "message": "Invalid action!"}
@@ -104,7 +102,7 @@ def auth_route(action):
 # only allow logged in users to access the home page
 @app.route('/home/')
 def home():
-    if 'username' in session:
+    if 'email' in session:
         return send_from_directory('static', 'home.html')
     return redirect(url_for('login'))  # Redirect to login page if the user is not logged in
 
@@ -112,30 +110,30 @@ def home():
 # ==================== API for authenticated users ====================
 @app.route('/api/<path:action>', methods=['GET', 'POST'])
 def api_route(action):
-    if 'username' not in session:
-        return {"success": False, "message": "You are not logged in!"}
+    if 'email' not in session:
+        return {"success": False, "message": "You are not logged in! Go back to <a herf=\"/\">home</a>"}
+    else:
+        email = session['email']
+        handle = db.search_user(email=email)['handle']
 
     if action == 'logout/' or action == 'logout':
-        time.sleep(0.3)
-        session.pop('username', None)
+        session.pop('email', None)
         return {"success": True}
 
     elif action == 'userinfo/' or action == 'userinfo':
-        username = session['username']
-        return {"username": username}
+        user = db.search_user(email=email)
+        return {"success": True, "email": user['email'], "name": user['handle']}
 
     elif action == 'checkslug/' or action == 'checkslug':
         title = request.form['checkslug']
-        username = session['username']
-        if os.path.exists(os.path.join('userdata', username, title)):
+        if os.path.exists(os.path.join('userdata', handle, title)):
             return {"exists": True}
         else:
             return {"exists": False}
 
     elif action == 'getpages/' or action == 'getpages':
         # check the folder for the user
-        username = session['username']
-        user_dir = os.path.join('userdata', username)
+        user_dir = os.path.join('userdata', handle)
         if not os.path.exists(user_dir):
             return {"pages": []}
         # get all the folders in the user's folder
@@ -146,9 +144,8 @@ def api_route(action):
 
     elif action == 'download/' or action == 'download':
         # check the folder for the user
-        username = session['username']
         slug = request.form.get('slug', '')
-        user_dir = os.path.join('userdata', username)
+        user_dir = os.path.join('userdata', handle)
         slug_dir = os.path.join(user_dir, slug)
         if not os.path.exists(slug_dir):
             return {"success": False, "message": "Slug does not exist!"}
@@ -170,9 +167,8 @@ def api_route(action):
                          mimetype='application/zip')
 
     elif action == 'delete/' or action == 'delete':
-        username = session['username']
         slug = request.form.get('slug', '')
-        user_dir = os.path.join('userdata', username)
+        user_dir = os.path.join('userdata', handle)
         slug_dir = os.path.join(user_dir, slug)
         if not os.path.exists(slug_dir):
             return {"success": False, "message": "Slug does not exist!"}
@@ -181,29 +177,25 @@ def api_route(action):
         shutil.rmtree(slug_dir)
         return {"success": True, "message": "Slug deleted successfully!"}
 
-
     elif action == 'upload/' or action == 'upload':
-        username = session['username']
         slug = request.form.get('slug', '')
-        user_dir = os.path.join('userdata', username)
+        user_dir = os.path.join('userdata', handle)
         slug_dir = os.path.join(user_dir, slug)
 
         if os.path.exists(slug_dir):  # check if slug exists
             return {"success": False, "message": "Slug already exists!"}
         if slug == '':  # check if slug is empty
             return {"success": False, "message": "Slug cannot be empty!"}
-        if not slug.replace("-", "").isalnum(): # check if slug is alphanumeric
+        if not slug.replace("-", "").isalnum():  # check if slug is alphanumeric
             return {"success": False, "message": "Slug must be alphanumeric!"}
         if len(slug) > 20:  # check if slug is less than 20 characters
             return {"success": False, "message": "Slug must be less than 20 characters!"}
-
-        time.sleep(1)
 
         if 'file' not in request.files:  # Check if files are sent
             return {"success": False, "message": "No file part"}
         files = request.files.getlist('file')  # Get all files
 
-        # Ensure the username directory exists
+        # Ensure the handle directory exists
         if not os.path.exists(user_dir):
             os.makedirs(user_dir)
 
